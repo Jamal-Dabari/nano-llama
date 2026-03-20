@@ -36,8 +36,8 @@ public class GGUF implements Closeable {
       tensorCount = segment.get(ValueLayout.JAVA_LONG, offset);
       offset += 8;
       metadata_kv_count = segment.get(ValueLayout.JAVA_LONG, offset);
-      parseMetadata();
       offset += 8;
+      parseMetadata();
 
       file.close();
 
@@ -83,21 +83,67 @@ public class GGUF implements Closeable {
     int typeInt = segment.get(ValueLayout.JAVA_INT, offset);
     offset += 4;
     GGUFValueType type = GGUFValueType.fromInt(typeInt);
+    Object obj = null;
 
     switch (type) {
       case UINT8:
-        segment.get(ValueLayout.JAVA_INT, offset);
-        offset += 4;
-      case INT8:
-        segment.get(ValueLayout.JAVA_INT, offset);
-        offset += 4;
-      case UINT16:
-      case INT32:
-      case FLOAT32:
-      case BOOL:
-      case STRING:
-      case ARRAY:
+        obj = segment.get(ValueLayout.JAVA_BYTE, offset);
+        offset += 1;
         break;
+      case INT8:
+        obj = segment.get(ValueLayout.JAVA_BYTE, offset);
+        offset += 1;
+        break;
+      case UINT16:
+        obj = segment.get(ValueLayout.JAVA_SHORT, offset);
+        offset += 2;
+        break;
+      case INT16:
+        obj = segment.get(ValueLayout.JAVA_SHORT, offset);
+        offset += 2;
+        break;
+      case UINT32:
+        obj = segment.get(ValueLayout.JAVA_INT, offset);
+        offset += 4;
+        break;
+      case INT32:
+        obj = segment.get(ValueLayout.JAVA_INT, offset);
+        offset += 4;
+        break;
+      case UINT64:
+        obj = segment.get(ValueLayout.JAVA_LONG, offset);
+        offset += 8;
+        break;
+      case INT64:
+        obj = segment.get(ValueLayout.JAVA_LONG, offset);
+        offset += 8;
+        break;
+      case FLOAT32:
+        obj = segment.get(ValueLayout.JAVA_FLOAT, offset);
+        offset += 4;
+        break;
+      case FLOAT64:
+        obj = segment.get(ValueLayout.JAVA_DOUBLE, offset);
+        offset += 8;
+        break;
+      case BOOL:
+        obj = segment.get(ValueLayout.JAVA_BOOLEAN, offset);
+        offset += 1;
+        break;
+      case STRING:
+        obj = readString();
+        break;
+      case ARRAY:
+        int elementType = segment.get(ValueLayout.JAVA_INT, offset);
+        offset += 4;
+        long count = segment.get(ValueLayout.JAVA_LONG, offset);
+        offset += 8;
+        Object[] arr = new Object[(int) count];
+        for (int i = 0; i < count; i++) {
+          arr[i] = readValue();
+          obj = arr;
+
+        }
       default:
         break;
     }
