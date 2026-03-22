@@ -1,4 +1,4 @@
-package main.java.nanollama.model;
+package dev.jamal.nanollama.model;
 
 enum GGUFValueType {
   UINT8(0),

@@ -1,4 +1,4 @@
-package main.java.nanollama.model;
+package dev.jamal.nanollama.model;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -9,17 +9,22 @@ import java.lang.foreign.ValueLayout;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import 
 
 public class GGUF implements Closeable {
+  public static final ValueLayout.OfInt LITTLE_INT = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN);
+  public static final ValueLayout.OfLong LITTLE_LONG = ValueLayout.JAVA_LONG.withOrder(ByteOrder.LITTLE_ENDIAN);
   private int magic;
   private int version;
   private long tensorCount; // uint_64
   private long metadata_kv_count; // uint_64
   private Map<String, Object> metadata;
-  private Arena arena = Arena.ofConfined();
+  private Arena arena = Arena.ofShared();
   private MemorySegment segment;
   private long offset;
+  private List<Tensor> tensors;
 
   public void load(RandomAccessFile file) throws IOException {
     offset = 0;
@@ -27,16 +32,12 @@ public class GGUF implements Closeable {
       long channelSize = channel.size();
       segment = channel.map(FileChannel.MapMode.READ_ONLY, 0, channelSize, arena);
 
-      magic = segment.get(ValueLayout.JAVA_INT, offset);
+      magic = readInt();
       readAndVerifyMagicNumber(magic);
-      offset += 4;
-      version = segment.get(ValueLayout.JAVA_INT, offset);
+      version = readInt();
       readVersion(version);
-      offset += 4;
-      tensorCount = segment.get(ValueLayout.JAVA_LONG, offset);
-      offset += 8;
-      metadata_kv_count = segment.get(ValueLayout.JAVA_LONG, offset);
-      offset += 8;
+      tensorCount = readLong();
+      metadata_kv_count = readLong();
       parseMetadata();
 
       file.close();
@@ -153,10 +154,38 @@ public class GGUF implements Closeable {
   }
 
   private void parseTensorInfo() {
+    Tensor tensor = new Tensor();
+    tensor.name = readString();
+    tensor.nDimensions = readInt();
+    tensor.dimensions = new long[tensor.nDimensions];
+    for (int i = 0; i < tensor.nDimensions; i++) {
+      tensor.dimensions[i] = readLong();
+    }
+    tensor.type = GGMLTYPE.fromInt(readInt());
+    tensor.offset = readLong();
+
+    tensors.add(tensor);
+
   }
 
-  private void calcTensorDataOffset() {
+  private long calcTensorDataOffset(long offset) {
+    int ALIGNMENT = (int) metadata.getOrDefault("general.alignment", 32);
+    return offset + (ALIGNMENT - (offset % ALIGNMENT)) % ALIGNMENT;
   }
+
+  private int readInt(){
+    int value = segment.get(ValueLayout.JAVA_INT, offset);
+    offset +=4;
+    return value;
+  }
+
+  private long readLong(){
+    long value = segment.get(ValueLayout.JAVA_LONG, offset);
+    offset +=8;
+    return value;
+
+  }
+
 
   @Override
   public void close() {

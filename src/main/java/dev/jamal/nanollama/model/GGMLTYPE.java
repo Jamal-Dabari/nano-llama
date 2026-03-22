@@ -1,4 +1,4 @@
-package main.java.nanollama.model;
+package dev.jamal.nanollama.model;
 
 enum GGMLTYPE {
   GGML_TYPE_F32(0),
