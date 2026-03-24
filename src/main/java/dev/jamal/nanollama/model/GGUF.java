@@ -6,12 +6,12 @@ import java.io.RandomAccessFile;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import 
 
 public class GGUF implements Closeable {
   public static final ValueLayout.OfInt LITTLE_INT = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN);
@@ -173,19 +173,25 @@ public class GGUF implements Closeable {
     return offset + (ALIGNMENT - (offset % ALIGNMENT)) % ALIGNMENT;
   }
 
-  private int readInt(){
-    int value = segment.get(ValueLayout.JAVA_INT, offset);
-    offset +=4;
+  // Helper function
+  private int readInt() {
+    int value = segment.get(LITTLE_INT, offset);
+    offset += 4;
     return value;
   }
 
-  private long readLong(){
-    long value = segment.get(ValueLayout.JAVA_LONG, offset);
-    offset +=8;
+  // Helper function
+  private long readLong() {
+    long value = segment.get(LITTLE_LONG, offset);
+    offset += 8;
     return value;
 
   }
 
+  private short readShort() {
+    short value = segment.get(ValueLayout.JAVA_SHORT, offset);
+    return value;
+  }
 
   @Override
   public void close() {
