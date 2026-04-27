@@ -15,7 +15,10 @@ import java.util.Map;
 
 public class GGUF implements Closeable {
   public static final ValueLayout.OfInt LITTLE_INT = ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN);
+  public static final ValueLayout.OfDouble LITTLE_DOUBLE = ValueLayout.JAVA_DOUBLE.withOrder(ByteOrder.LITTLE_ENDIAN);
   public static final ValueLayout.OfLong LITTLE_LONG = ValueLayout.JAVA_LONG.withOrder(ByteOrder.LITTLE_ENDIAN);
+  public static final ValueLayout.ofShort LITTLE_SHORT = ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN);
+  public static final ValueLayout.ofByte LITTLE_BYTE = ValueLayout.JAVA_BYTE.withOrder(ByteOrder.LITTLE_ENDIAN);
   private int magic;
   private int version;
   private long tensorCount; // uint_64
@@ -24,7 +27,7 @@ public class GGUF implements Closeable {
   private Arena arena = Arena.ofShared();
   private MemorySegment segment;
   private long offset;
-  private List<Tensor> tensors;
+  private List<Tensor> tensors = new ArrayList<>;
 
   public void load(RandomAccessFile file) throws IOException {
     offset = 0;
@@ -39,6 +42,9 @@ public class GGUF implements Closeable {
       tensorCount = readLong();
       metadata_kv_count = readLong();
       parseMetadata();
+      for (long i = 0; i < tensorCount; i++){
+        parseTensorInfo();
+      }
 
       file.close();
 
@@ -71,7 +77,7 @@ public class GGUF implements Closeable {
   }
 
   private String readString() {
-    long length = segment.get(ValueLayout.JAVA_LONG, offset);
+    long length = segment.get(LITTLE_LONG, offset);
     offset += 8;
     byte[] bytes = new byte[(int) length];
     MemorySegment.copy(segment, ValueLayout.JAVA_BYTE, offset, bytes, 0, (int) length);
@@ -81,7 +87,7 @@ public class GGUF implements Closeable {
   }
 
   private Object readValue() {
-    int typeInt = segment.get(ValueLayout.JAVA_INT, offset);
+    int typeInt = segment.get(LITTLE_INT, offset);
     offset += 4;
     GGUFValueType type = GGUFValueType.fromInt(typeInt);
     Object obj = null;
@@ -104,19 +110,19 @@ public class GGUF implements Closeable {
         offset += 2;
         break;
       case UINT32:
-        obj = segment.get(ValueLayout.JAVA_INT, offset);
+        obj = segment.get(LITTLE_INT, offset);
         offset += 4;
         break;
       case INT32:
-        obj = segment.get(ValueLayout.JAVA_INT, offset);
+        obj = segment.get(LITTLE_INT, offset);
         offset += 4;
         break;
       case UINT64:
-        obj = segment.get(ValueLayout.JAVA_LONG, offset);
+        obj = segment.get(LITTLE_LONG, offset);
         offset += 8;
         break;
       case INT64:
-        obj = segment.get(ValueLayout.JAVA_LONG, offset);
+        obj = segment.get(LITTLE_LONG, offset);
         offset += 8;
         break;
       case FLOAT32:
@@ -142,9 +148,8 @@ public class GGUF implements Closeable {
         Object[] arr = new Object[(int) count];
         for (int i = 0; i < count; i++) {
           arr[i] = readValue();
-          obj = arr;
-
         }
+          obj = arr;
       default:
         break;
     }
@@ -155,6 +160,7 @@ public class GGUF implements Closeable {
 
   private void parseTensorInfo() {
     Tensor tensor = new Tensor();
+    tensors = new ArrayList<>;
     tensor.name = readString();
     tensor.nDimensions = readInt();
     tensor.dimensions = new long[tensor.nDimensions];
@@ -189,7 +195,14 @@ public class GGUF implements Closeable {
   }
 
   private short readShort() {
-    short value = segment.get(ValueLayout.JAVA_SHORT, offset);
+    short value = segment.get(LITTLE_SHORT, offset);
+    offset += 2;
+    return value;
+  }
+
+  private Double readDouble() {
+    double value = segment.get(LITTLE_DOUBLE, offset);
+    offset += 8;
     return value;
   }
 
